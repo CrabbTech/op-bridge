@@ -1,0 +1,25 @@
+# environments and caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# secrets never live in the repo (they are in ~/Music/op-bridge/secrets.env), but just in case
+secrets.env
+*.env
+.env.*
+
+# local scratch and audio dumps
+scratch/
+*.wav
+*.aif
+*.aiff
+!tests/fixtures/**

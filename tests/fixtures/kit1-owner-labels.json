@@ -1,0 +1,19 @@
+{
+ "kit_name": "hard spunch",
+ "slot": "drum 1",
+ "source": "labelled by Tyler by ear on 2026-09-26; Field display names are one octave below MIDI names (Field F2 = MIDI 53)",
+ "keys": {
+  "53": {"field_name": "F2", "label": "kick", "notes": "bass drum"},
+  "54": {"field_name": "F#2", "label": "kick", "notes": "bass drum with a little cymbal"},
+  "55": {"field_name": "G2", "label": "snare", "notes": "snares on"},
+  "56": {"field_name": "G#2", "label": "snare", "notes": "snares off"},
+  "60": {"field_name": "C3", "label": "closed hat"},
+  "61": {"field_name": "C#3", "label": "closed hat", "notes": "chokes the open hat on D#3"},
+  "62": {"field_name": "D3", "label": "closed hat"},
+  "63": {"field_name": "D#3", "label": "open hat", "notes": "rings until choked by C#3"},
+  "64": {"field_name": "E3", "label": "closed hat"}
+ },
+ "roles": {"BD": 53, "BD2": 54, "SN": 55, "SN2": 56, "CH": 60, "CH_CHOKE": 61, "OH": 63},
+ "features_file": "/Users/tyler/Music/op-bridge/probe/kit1/features.json",
+ "clips_dir": "/Users/tyler/Music/op-bridge/probe/kit1"
+}
