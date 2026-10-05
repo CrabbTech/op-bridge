@@ -14,6 +14,6 @@
   "64": {"field_name": "E3", "label": "closed hat"}
  },
  "roles": {"BD": 53, "BD2": 54, "SN": 55, "SN2": 56, "CH": 60, "CH_CHOKE": 61, "OH": 63},
- "features_file": "/Users/tyler/Music/op-bridge/probe/kit1/features.json",
- "clips_dir": "/Users/tyler/Music/op-bridge/probe/kit1"
+ "features_file": "~/Music/op-bridge/probe/kit1/features.json",
+ "clips_dir": "~/Music/op-bridge/probe/kit1"
 }

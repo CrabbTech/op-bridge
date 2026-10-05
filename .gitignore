@@ -23,3 +23,9 @@ scratch/
 *.aif
 *.aiff
 !tests/fixtures/**
+
+# Teenage Engineering's documentation is added locally and never committed (see docs/reference/README.md)
+docs/reference/*.pdf
+docs/reference/op-1-field-user-guide-*.txt
+docs/reference/midi-reference-*.txt
+docs/reference/firmware-changelog.txt

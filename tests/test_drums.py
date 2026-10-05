@@ -9,7 +9,7 @@ from op_bridge.score import Score, compile_events, validate
 from op_bridge.session import Config
 
 KIT_JSON = os.path.join(os.path.dirname(__file__), "fixtures", "kit1-owner-labels.json")
-FIELD_KITS = "/Users/tyler/Music/op-bridge/field-backup/2026-09-26-disk/drum/user"
+FIELD_KITS = os.path.expanduser("~/Music/op-bridge/field-backup/2026-09-26-disk/drum/user")
 
 # the introductory example of the drum pattern books: kick on 1 and 3, snare on 2 and 4, closed hats on every 8th
 BOOK_INTRO = {

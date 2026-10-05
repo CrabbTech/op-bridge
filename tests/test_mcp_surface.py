@@ -8,6 +8,7 @@ import pytest
 from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
+from op_bridge import knowledge
 from tests.conftest import field_present
 
 
@@ -42,7 +43,8 @@ async def test_tools_and_readonly_calls(home):
             g = await s.call_tool("get_guide", {"topic": "score"})
             assert "tempo" in _text(g)
             m = await s.call_tool("search_manual", {"query": "usb audio modes"})
-            assert "10 channel" in _text(m)
+            # the user guide is Teenage Engineering's and is added locally (docs/reference/README.md); without it the tool says how
+            assert ("10 channel" if os.path.exists(knowledge.manual_path()) else "extract-manual.py") in _text(m)
             v = await s.call_tool("validate_score", {"score": {"tempo": 100, "notes": [{"start": 0, "duration": 1, "pitch": "C4"}, {"start": 0, "duration": 1, "pitch": "E4"}]}})
             vd = v.structured_content or json.loads(_text(v))
             assert vd["ok"] is True and vd["max_polyphony"] == 2

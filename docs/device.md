@@ -227,7 +227,7 @@ the time: channel 8 (then changed to 1), clock off, notes both, other both, SPP 
   hears, so a stem backup of the tape is a playback capture of all eight channels. The master
   bus (EQ, master FX, drive) still is not in the USB stream.
 
-## 10. From the firmware 1.7 manual (docs/reference/op-1-field-user-guide-fw1.7.pdf)
+## 10. From the firmware 1.7 manual (Teenage Engineering's user guide; see docs/reference/README.md)
 
 - **USB audio modes** (system settings, labelled USB MODE on the device: 2CH, 8CH, 10CH): 2 channel = stereo only;
   8 channel = tape tracks 1 to 4; 10 channel = main stereo plus tape tracks 1 to 4. Ten-channel mode is how the Mac gets the

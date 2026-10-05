@@ -8,6 +8,12 @@ from .score import SCORE_GUIDE
 from .sequencers import SEQUENCER_GUIDE
 
 REFERENCE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs", "reference")
+# Teenage Engineering's documents are not distributed with the bridge; docs/reference/README.md says how to add them
+MANUAL_MISSING = ("manual not found: Teenage Engineering's user guide is not distributed with op-bridge. Download the PDF from "
+                  "https://teenage.engineering/guides/op-1 and run: uv run scripts/extract-manual.py <pdf> "
+                  "(details in docs/reference/README.md). get_guide('device') holds what was verified on the real device.")
+MIDI_MISSING = ("MIDI reference not found: Teenage Engineering's MIDI tables are not distributed with op-bridge "
+                "(docs/reference/README.md says how to add them). get_guide('device') holds the verified CC map.")
 
 OVERVIEW = """OP-1 field in one page.
 
@@ -328,20 +334,25 @@ def guide(topic: str = "overview") -> str:
         return json.dumps(engines_catalog(), indent=1)
     if topic in ("midi", "cc"):
         p = os.path.join(REFERENCE_DIR, "midi-reference-fw1.7.0.txt")
-        return open(p).read() if os.path.exists(p) else "MIDI reference not found"
+        return open(p).read() if os.path.exists(p) else MIDI_MISSING
     if topic in ("manual", "guide"):
-        p = os.path.join(REFERENCE_DIR, "op-1-field-user-guide-fw1.7.txt")
-        return open(p).read() if os.path.exists(p) else "manual not found"
+        p = manual_path()
+        return open(p).read() if os.path.exists(p) else MANUAL_MISSING
     if topic == "device":
         p = os.path.join(os.path.dirname(REFERENCE_DIR), "device.md")
         return open(p).read() if os.path.exists(p) else "device brief not found"
     return f"unknown topic {topic!r}; try overview, workflow, listening, score, sampler, sequencers, engines, midi, manual, device"
 
 
+def manual_path() -> str:
+    """Where a local copy of the user guide text lives, if the user added one."""
+    return os.path.join(REFERENCE_DIR, "op-1-field-user-guide-fw1.7.txt")
+
+
 def manual_search(query: str, context: int = 400) -> str:
-    p = os.path.join(REFERENCE_DIR, "op-1-field-user-guide-fw1.7.txt")
+    p = manual_path()
     if not os.path.exists(p):
-        return "manual not found"
+        return MANUAL_MISSING
     text = open(p).read()
     low = text.lower(); q = query.lower()
     hits = []
