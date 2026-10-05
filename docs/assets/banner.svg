@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-labelledby="t d">
+  <title id="t">op-bridge</title>
+  <desc id="d">An abstract small synthesizer with a screen, four coloured encoders and a two-row keyboard with a chord lit, beside the words: op-bridge. Lets an AI model play a hardware synthesizer over USB MIDI, and listen to what it played.</desc>
+
+  <!-- card: carries its own dark background so it reads the same on light and dark themes -->
+  <rect x="1" y="1" width="1198" height="298" rx="18" fill="#111214" stroke="#2c2e33" stroke-width="2"/>
+
+  <!-- instrument body -->
+  <rect x="60" y="50" width="440" height="200" rx="14" fill="#1c1d20" stroke="#3a3c41" stroke-width="2"/>
+
+  <!-- screen with a small waveform -->
+  <rect x="84" y="74" width="150" height="70" rx="6" fill="#0a0a0b" stroke="#33353a" stroke-width="1.5"/>
+  <polyline fill="none" stroke="#e8e9eb" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+    points="96,109 104,109 108,96 113,124 118,90 123,128 128,98 133,118 138,104 143,112 148,108 156,109 162,109 166,101 170,117 174,105 178,112 182,109 222,109"/>
+
+  <!-- four encoders: blue, ochre, gray, orange -->
+  <g stroke="#0e0f10" stroke-width="2">
+    <circle cx="290" cy="109" r="21" fill="#3d7be0"/>
+    <circle cx="345" cy="109" r="21" fill="#c9a227"/>
+    <circle cx="400" cy="109" r="21" fill="#9aa0a6"/>
+    <circle cx="455" cy="109" r="21" fill="#f0643c"/>
+  </g>
+  <g stroke="#0e0f10" stroke-width="3" stroke-linecap="round">
+    <line x1="290" y1="109" x2="290" y2="94"/>
+    <line x1="345" y1="109" x2="356" y2="98"/>
+    <line x1="400" y1="109" x2="385" y2="109"/>
+    <line x1="455" y1="109" x2="466" y2="120"/>
+  </g>
+
+  <!-- keyboard, upper row (black keys in groups of two and three) -->
+  <g fill="#26282c">
+    <rect x="98"  y="166" width="24" height="26" rx="4"/>
+    <rect x="126" y="166" width="24" height="26" rx="4"/>
+    <rect x="182" y="166" width="24" height="26" rx="4"/>
+    <rect x="210" y="166" width="24" height="26" rx="4"/>
+    <rect x="238" y="166" width="24" height="26" rx="4"/>
+    <rect x="294" y="166" width="24" height="26" rx="4"/>
+    <rect x="322" y="166" width="24" height="26" rx="4"/>
+    <rect x="378" y="166" width="24" height="26" rx="4"/>
+    <rect x="406" y="166" width="24" height="26" rx="4"/>
+    <rect x="434" y="166" width="24" height="26" rx="4"/>
+  </g>
+
+  <!-- keyboard, lower row: fourteen keys, a C major chord lit -->
+  <g fill="#34363b">
+    <rect x="112" y="198" width="24" height="28" rx="4"/>
+    <rect x="168" y="198" width="24" height="28" rx="4"/>
+    <rect x="224" y="198" width="24" height="28" rx="4"/>
+    <rect x="252" y="198" width="24" height="28" rx="4"/>
+    <rect x="280" y="198" width="24" height="28" rx="4"/>
+    <rect x="308" y="198" width="24" height="28" rx="4"/>
+    <rect x="336" y="198" width="24" height="28" rx="4"/>
+    <rect x="364" y="198" width="24" height="28" rx="4"/>
+    <rect x="392" y="198" width="24" height="28" rx="4"/>
+    <rect x="420" y="198" width="24" height="28" rx="4"/>
+    <rect x="448" y="198" width="24" height="28" rx="4"/>
+  </g>
+  <g fill="#eceef0">
+    <rect x="84"  y="198" width="24" height="28" rx="4"/>
+    <rect x="140" y="198" width="24" height="28" rx="4"/>
+    <rect x="196" y="198" width="24" height="28" rx="4"/>
+  </g>
+
+  <!-- signal: out to the right of the instrument -->
+  <g fill="#3d7be0">
+    <circle cx="522" cy="150" r="3"/>
+    <circle cx="536" cy="150" r="3"/>
+    <circle cx="550" cy="150" r="3"/>
+  </g>
+
+  <!-- words -->
+  <text x="584" y="124" fill="#f4f4f5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="-1">op-bridge</text>
+  <text x="586" y="168" fill="#b4b7bd" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22">Lets an AI model play a hardware synthesizer</text>
+  <text x="586" y="198" fill="#b4b7bd" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22">over USB MIDI, and listen to what it played.</text>
+
+  <!-- the loop, with the encoder colours as markers -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b8f96">
+    <circle cx="590" cy="241" r="5" fill="#3d7be0"/>
+    <text x="602" y="246">MCP tools</text>
+    <circle cx="712" cy="241" r="5" fill="#c9a227"/>
+    <text x="724" y="246">MIDI out</text>
+    <circle cx="824" cy="241" r="5" fill="#9aa0a6"/>
+    <text x="836" y="246">USB audio in</text>
+    <circle cx="966" cy="241" r="5" fill="#f0643c"/>
+    <text x="978" y="246">analysis</text>
+  </g>
+</svg>

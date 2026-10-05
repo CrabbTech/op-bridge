@@ -1,188 +1,222 @@
-# op-bridge
+<p align="center">
+  <img src="docs/assets/banner.svg" width="100%" alt="op-bridge: lets an AI model play a hardware synthesizer over USB MIDI, and listen to what it played.">
+</p>
 
-An MCP server that lets an AI model **wield a Teenage Engineering OP-1 field**: choose and design
-sounds, play parts with expression, run the tape and mixer, listen back through the Field's USB
-audio, and keep local backups. The Field is the instrument and the studio; the computer only
-sends MIDI and listens.
+<p align="center">
+  <b>An MCP server that lets an AI model play a Teenage Engineering OP-1 field synthesizer,<br>
+  record every take from the device's own audio, and check what was actually heard.</b>
+</p>
 
-Works from Claude Desktop, Claude Code and any stdio MCP client, and from claude.ai or ChatGPT
-through a public HTTPS tunnel (Streamable HTTP).
+<p align="center">
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <img alt="MCP server" src="https://img.shields.io/badge/MCP-server-1f2328">
+  <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-555555?logo=apple&logoColor=white">
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/license-MIT-2b7a3d"></a>
+</p>
 
-## What the model can do
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/tools.md">All 72 tools</a> ·
+  <a href="#making-a-finicky-device-reliable-and-honest">Engineering notes</a> ·
+  <a href="docs/device.md">What was verified on the device</a>
+</p>
 
-- **Sounds**: load any of the 16 slots, turn every encoder on the engine, envelope, FX and LFO
-  pages, randomize or revert a patch, and *author presets* (engine type, FX type, LFO type, octave,
-  envelope) from Field-written values, installed when the Field is in disk mode. The Field
-  validates preset values per engine, so authored files are composed from values the Field itself
-  wrote (learned with `learn_engines` from factory presets) and knobs are then shaped live over CC.
-- **Playing**: scores with velocity, timing feel, CC automation, pitch bend and sustain, sent with
-  MIDI clock. Every take is recorded from the Field's USB audio and analysed: which notes were
-  heard, timing, level, clipping, spectral movement, plus a spectrogram image the model can view.
-  `measure_take` goes deeper on any take (band levels from sub to air, a pitch track with vibrato,
-  harmonic levels, periodic movement, onsets) and `view_spectrogram(id, log_frequency=true)` shows
-  the low end; `audition_slots` hears a list of slots in one call.
-- **Tape and mix**: transport, loop points, per-track level/pan/mute, master EQ, master FX, drive.
-  Recording to tape needs the human to select the track and arm record; the model's first note
-  starts the take.
-- **Sampler**: turn any WAV, or a region cut from a recorded take (`sample_from_take`), into a
-  synth sampler preset (`author_sampler_preset`, 6 s, positions on the Field's fixed 6 s timeline)
-  installed in the same disk-mode round: play a sound, record it, cut it, author it.
-  Sampling from the Field's inputs stays a human action with exact key presses in `human_steps`.
-- **Sequencers**: `list_sequencers` and `get_guide("sequencers")` describe the seven sequencers;
-  `hold_chord` holds a chord with clock for the arpeggio, hold and tombola sequencers once the human
-  has enabled one, and `song_position` sends the song position pointer.
-- **Drums**: a grid notation the model writes from any step diagram (accents, ghosts, ratchets, swing,
-  chained sections), kit maps that label all 24 keys of a kit from their audio with human corrections,
-  beats played on the Field or recorded to tape, and the endless sequencer programmed over MIDI.
-- **Sound index and search**: `audit_sound` measures a slot at three pitches and tags it (dark/warm/bright,
-  sustained/decaying/short, harmonic/noisy, moving) with role suggestions; `find_sounds` ranks the index
-  against a plain request; `sound_search` randomizes a slot and auditions each roll against a request.
-  `slot_profile` knows a sampler's root and every slot's playable range, and playing tools transpose
-  out-of-range parts by octaves. Ranking uses the local rules, or TypeSafe's Jev when
-  `TYPESAFE_API_KEY` is set in `~/Music/op-bridge/secrets.env` (owner-only file, loaded at start) and the
-  judge mode allows it: `uv run op-bridge judge auto|local|jev`. Everything works without Jev.
-- **Arrangement**: a node graph of sections, parts (a clip per section: score, drum pattern, chords,
-  reuse, rest), automation and edges; compiled to one score per part and recorded track by track.
-- **Voices, when wanted**: `speak_through_vocoder` places spoken lines on the beat grid, holds carrier
-  chords, can send clock and record straight to tape, and scores the result with STOI
-  (`speech_intelligibility` does the same for any take against its speech). Nothing assumes a vocal:
-  `stream_to_tape` puts any WAV or spoken text on a track dry through the USB input (the human toggles the
-  input key in tape mode and presses record + play, as TE's guide says), a sung or spoken WAV can become a
-  sampler preset, or vocals can be mixed with the stems outside the Field.
-- **Seeds**: capture what the player plays on the Field (chords, progression, key and tempo
-  guesses, encoder moves, the audio) and build on it.
-- **Backups**: play the tape and capture all USB channels as stems; in the Field's 10-channel
-  USB mode the main mix with the master bus is captured too.
-- **Long operations are jobs**: a take, tape recording, arrangement part, drum pattern, vocoder line,
-  tape backup or seed capture longer than about 25 s returns a `job_id` at once (chat clients cut a
-  tool call off near a minute); `job_status` reports progress and then the same result a direct call
-  gives, `cancel_job` stops it and releases the notes, and other device calls are refused as busy
-  meanwhile. `wait=false` forces a job, `wait=true` insists on waiting.
-- **Two modes**: `freeform` (every tool) and `guided` (the human owns settings and sets
-  constraints: key, tempo, polyphony, allowed slots, which parameter groups the model may touch).
-  The model can only tighten constraints; the human loosens them with the CLI.
+op-bridge connects any MCP client (Claude Desktop, Claude Code, Codex, or claude.ai and ChatGPT
+through a tunnel) to an OP-1 field plugged into a Mac. The model picks and designs sounds, plays
+scores with velocity, automation and pitch bend, runs the tape and mixer, writes presets, and
+programs drums and sequencers. The Field is the instrument and the studio; the computer only sends
+MIDI and listens.
 
-The model's reference material travels with the server: `get_guide`, `search_manual` (TE's
-firmware 1.7 manual), `list_engines`, `human_steps` (exact key presses for the human).
+The listening is the point. Every take is recorded from the Field's USB audio and measured, so the
+model works from what came out of the device, not from what it meant to send.
 
-## What the Field cannot tell you
+## What happens when you ask it to play something
 
-The Field has no state read-back: in normal mode it transmits only the keys you play, nothing for
-mode, sound or transport changes. The bridge therefore remembers what it last set (shown in
-`get_status`), accepts hand changes through `set_device_state`, can guess synth versus drum by ear
-with `detect_mode`, and every playing tool selects the sound it needs first.
+1. **It orients itself.** The server's instructions send the model to `get_guide("quickstart")` and
+   `get_status`: is the Field connected, which mode the human has set, what the bridge last set on
+   the device (the Field cannot be queried), and whether a job is already running.
+2. **It chooses a sound from what is known.** Palette notes, `slot_profile` (engine, playable
+   range), `find_sounds` over an index of audited slots, then `audition_slots` to hear the
+   candidates in one call.
+3. **It writes a score and checks it.** `validate_score` checks the notes against the Field's
+   voices and range and, in guided mode, the session's key, tempo and parameter limits, before
+   anything plays.
+4. **It plays and records.** `play(score, record=true)` sets the Field's tempo to the score's, sends
+   notes, CC automation, pitch bend and MIDI clock, and records the USB audio at the same time. Anything
+   longer than about 25 seconds returns a `job_id` at once; the model polls `job_status` for the
+   same result a direct call would give.
+5. **It reads what was heard.** A real rehearsal take from 2026-09-30, trimmed (values from the
+   take's JSON sidecar):
 
-## Setup
+   ```jsonc
+   {
+     "take_id": "reh-voices-37-40-20260930-201215",
+     "analysis": {
+       "live_usb_channels": [3, 4],                       // the selected tape track's pair
+       "main_mix": {"peak_db": -9.1, "rms_db": -26.4, "clipping_fraction": 0.0},
+       "peak_db": -14.2, "rms_db": -31.0, "clipping_fraction": 0.0,
+       "spectral_centroid_hz": {"median": 3996, "min": 1686, "max": 5192},
+       "notes_checked": 16, "notes_heard": 16,
+       "notes": [
+         {"beat": 0.0, "pitch": "F#4", "heard": true, "prominence_db": 43.9, "onset_offset_ms": -4.5}
+         // ... 15 more
+       ]
+     },
+     "spectrogram": "view_spectrogram(\"reh-voices-37-40-20260930-201215\")"
+   }
+   ```
+
+   Then it looks: `view_spectrogram` returns the image below, and `measure_take` adds band levels,
+   a pitch track, harmonics and periodic movement when a question needs them.
+6. **It asks for hands when it needs them.** Arming a tape track is something MIDI cannot do, so
+   the model calls `human_steps("arm_recording")` and relays the exact key presses, then
+   `record_to_tape` commits the part. `backup_tape` keeps the stems on the Mac.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/spectrogram-voices.png" alt="Spectrogram of a four-bar rehearsal of the voices part: horizontal harmonic lines changing with each chord, with two upward pitch bends."></td>
+    <td width="50%"><img src="docs/assets/spectrogram-drums.png" alt="Spectrogram of a four-bar drum rehearsal: dense vertical strokes for each hit, busier in the second half."></td>
+  </tr>
+  <tr>
+    <td><sub><b>Voices</b>, the take above. The pitch-bend rises written into the score show near 2 s and 8 s.</sub></td>
+    <td><sub><b>Drums</b>, four bars at 80 BPM. Each hit is a vertical stroke.</sub></td>
+  </tr>
+</table>
+
+<sub>Both images are exactly what the model receives from <code>view_spectrogram</code>, rendered by op-bridge from takes
+recorded off the Field's USB audio on 2026-09-30. Time runs left to right, 0 to 8 kHz bottom to top; the red mark is the score start.</sub>
+
+## How it works
+
+```mermaid
+flowchart LR
+    model["AI model<br/>in any MCP client"]
+    bridge["op-bridge<br/>MCP server"]
+    field["OP-1 field"]
+    take["take on disk<br/>WAV + JSON + spectrogram"]
+    human(["human at the device"])
+
+    model -->|"tool call, e.g. play(score)"| bridge
+    bridge -->|"USB MIDI: notes, CC, clock"| field
+    field -->|"USB audio: 8 or 10 channels"| bridge
+    bridge -->|"record and analyse"| take
+    take -->|"notes heard, levels, timing, image"| model
+    bridge -.->|"human_steps: exact key presses"| human
+    human -.->|"arm record, disk mode"| field
+```
+
+The server is one Python process ([`src/op_bridge/server.py`](src/op_bridge/server.py)) speaking
+MCP over stdio, or Streamable HTTP for remote connectors. One lock guards the device, so two tool
+calls never drive it at once.
+
+## What it can do
+
+| Area | What the model gets |
+|---|---|
+| **Sounds** | Load any of the 16 slots, turn every encoder, randomize, audit and tag a slot from its recorded sound, search an index of sounds by plain description. |
+| **Presets** | Author synth and sampler presets as files and install them in a disk-mode round; resample a recorded take into a new instrument. |
+| **Playing** | Scores with velocity, swing, humanize, CC automation, pitch bend and sustain, sent with MIDI clock. |
+| **Drums** | A step-grid notation (accents, ghosts, ratchets, swing, sections), kit maps of all 24 keys, the endless sequencer over MIDI. |
+| **Tape and mix** | Transport, loops, per-track level, pan and mute, master EQ, effects and drive; stem backups. |
+| **Arrangement** | A graph of sections and parts compiled to one score per track, recorded track by track. |
+| **Listening** | Per-take measurements, spectrograms, `measure_take`, and optional audio-model descriptions ([listening.md](docs/listening.md)). |
+| **Voices** | Speech through the Field's vocoder or onto tape through the USB input, scored for intelligibility. Optional; nothing assumes a vocal. |
+| **Seeds** | Listen while the human plays and build on their chords, key and tempo. |
+
+The full surface, 72 tools in ten groups, is in [docs/tools.md](docs/tools.md).
+
+## Making a finicky device reliable and honest
+
+The OP-1 field was not built to be driven by software. It cannot report its state, ignores notes on
+the wrong channel, silently turns a malformed preset into a sample, and needs a human for several
+steps. These are the decisions that make the integration dependable, with the file that shows each.
+
+| Problem | What op-bridge does | Where |
+|---|---|---|
+| Documentation and reality disagree | Behaviour is tested on a real Field and written down with dates; untested items stay marked **verify**. The model's overview guide marks verified items with `*`. TE's reset CC did nothing in five trials, so `revert_sound` says so and returns the human step that works. | [`docs/device.md`](docs/device.md), [`knowledge.py`](src/op_bridge/knowledge.py) |
+| The Field cannot be queried | The bridge records what it last set and reports it in `get_status` with a note saying hand changes are unknown; `set_device_state` takes the human's changes; `detect_mode` guesses synth or drum by ear and labels the result a guess. | [`session.py`](src/op_bridge/session.py), [`server.py`](src/op_bridge/server.py) |
+| Some steps need hands on the device | `human_steps` returns exact key presses for over 30 tasks (arm a track, disk mode, sampling, sequencer setup). Tools that hit such a step return the instruction in their result instead of failing. | [`server.py`](src/op_bridge/server.py) |
+| Chat clients cut a tool call off near a minute | Work expected to exceed 25 s runs as a background job; `job_status` returns the identical result, `cancel_job` stops it between events and releases held notes. A direct call that cannot get the device within 3 s fails at once, naming the job that holds it. | [`jobs.py`](src/op_bridge/jobs.py), [`server.py`](src/op_bridge/server.py) |
+| A bad preset file becomes a sample on the device | Synth presets are composed only from values the Field itself wrote. Staged files are checked before anything is copied, and nothing is copied if one fails; replaced slots are backed up; each file is written under a temporary name, synced and read back before the staged copy is removed. | [`presets.py`](src/op_bridge/presets.py), [device.md §11](docs/device.md#11-preset-files-verified-2026-09-26) |
+| A model's opinion is not a measurement | Analysis numbers come from the audio; drum takes are judged by onsets, not pitch. Audio-model descriptions come back labelled as fallible, next to measured levels, and the server tells every connecting model they can be wrong. A Gemini review's `usable` flag means complete, not accurate. | [`player.py`](src/op_bridge/player.py), [listening.md](docs/listening.md) |
+| The human stays in charge | Guided mode enforces key, tempo, polyphony, allowed slots and which parameter groups the model may touch. The model can only tighten constraints; the human loosens them from the CLI. Refusals come back as readable tool errors. | [`session.py`](src/op_bridge/session.py) (`Constraints.tighten`, `Config.check`) |
+| Secrets and data leaving the machine | API keys are typed with hidden input into an owner-only file outside the repo. Audio goes to Google only on an explicit `backend="gemini"` call. TE's manual is not redistributed; the tools that use it explain how to add your own copy. | [`scripts/set-secret.sh`](scripts/set-secret.sh), [`gemini.py`](src/op_bridge/gemini.py), [`docs/reference`](docs/reference/README.md) |
+| Tests without the hardware | Device tests skip themselves when no Field is connected; the rest run offline, including a test that drives the real MCP server over stdio the way a client does. | [`tests/conftest.py`](tests/conftest.py), [`tests/test_mcp_surface.py`](tests/test_mcp_surface.py) |
+
+## Quick start
+
+You need an OP-1 field on USB-C in normal mode, a Mac, Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
-git clone <this repo> && cd op-bridge
+git clone https://github.com/CrabbTech/op-bridge.git && cd op-bridge
 uv sync
-uv run op-bridge status
+uv run op-bridge status        # shows whether the Field's MIDI port and audio device are visible
 ```
 
-On the Field (hold shift + COM, then T1 for system settings):
-
-- midi: channel 1 (or tell the bridge with `uv run op-bridge channel N`), clock **both**,
-  notes **both**, other **both**
-- system > USB MODE: **10CH** (the manual calls it usb audio modes: main stereo + tape tracks) so the main mix is captured
-- keep the Field in normal mode for playing and capture; the bridge only uses disk mode for preset
-  installs (whether MIDI and USB audio survive MTP or disk mode is unverified, see `docs/device.md`)
-
-The first audio capture on macOS asks for microphone permission for the process that runs the
-server; grant it.
-
-### Claude Desktop
-
-`claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "op-bridge": {
-      "command": "uv",
-      "args": ["--directory", "/ABSOLUTE/PATH/op-bridge", "run", "op-bridge", "serve"]
-    }
-  }
-}
-```
-
-On macOS the desktop app keeps this file in memory and writes its copy back on quit, so an entry
-added while the app is running is lost. Either edit with the app closed, or run this from any
-terminal (a detached worker quits Claude, merges the entry with a backup, and relaunches it):
-
-```bash
-python3 scripts/register-claude-desktop.py
-```
-
-### Claude Code
+On the Field (hold shift + COM, then T1): set **midi** to channel 1 with clock, notes and other
+enabled, and **usb audio** to **10 channel** so the main mix is captured. Grant microphone
+permission the first time macOS asks. Then add the server to your client, for example Claude Code:
 
 ```bash
 claude mcp add op-bridge -- uv --directory /ABSOLUTE/PATH/op-bridge run op-bridge serve
 ```
 
-### Codex CLI
+Claude Desktop, Codex CLI, and claude.ai or ChatGPT over a tunnel are in
+[docs/setup.md](docs/setup.md). Ask for something ("play a slow four-bar progression on synth 3
+and tell me what you heard"); the model takes it from there.
 
-`~/.codex/config.toml`:
-
-```toml
-[mcp_servers.op-bridge]
-command = "uv"
-args = ["--directory", "/ABSOLUTE/PATH/op-bridge", "run", "op-bridge", "serve"]
-```
-
-(or `codex mcp add op-bridge -- uv --directory /ABSOLUTE/PATH/op-bridge run op-bridge serve` on
-versions that have `codex mcp`). Any other stdio MCP client takes the same command and arguments.
-
-Every client sees the same 64 tools and the same guides (`get_guide("overview")` first, then
-`get_status`); the server carries its own instructions, so a new session needs no preamble beyond
-what you want made.
-
-### claude.ai and ChatGPT (remote connector)
-
-Both need a public HTTPS URL. Run the server over HTTP with a secret path, then expose it with a
-tunnel:
-
-```bash
-uv run op-bridge serve --http --port 8765 --path-secret auto --public
-```
-
-```bash
-cloudflared tunnel --url http://localhost:8765
-```
-
-The server prints its local URL, for example `http://127.0.0.1:8765/<secret>/mcp`; the connector
-URL is the tunnel host plus the same path. In claude.ai: Settings > Connectors > Add custom
-connector, paste the URL, no OAuth. In ChatGPT: Settings > Connectors > Advanced > Developer mode,
-add the URL. The secret path is the only access control, so treat the URL like a password and
-restart with a new one when done. Anyone with the URL can play your Field and read the session
-files, nothing more.
-
-## Modes and constraints (human side)
-
-```bash
-uv run op-bridge mode guided
-uv run op-bridge constraints set key="D minor" tempo=96 allow_master=false allowed_slots="synth 1,synth 3,drum 2"
-uv run op-bridge constraints clear
-uv run op-bridge mode freeform
-```
+> [!NOTE]
+> **Guided mode** keeps the model inside limits you set, for example `uv run op-bridge mode guided` and
+> `uv run op-bridge constraints set key="D minor" tempo=96 allow_master=false` ([details](docs/setup.md#modes-and-constraints)).
 
 ## Files
 
-Everything the bridge records lives under `~/Music/op-bridge` (override with `OP_BRIDGE_HOME`):
-`config.json`, `sessions/<name>/{takes,seeds,samples,backups}` (`samples/` holds the cuts
-`sample_from_take` makes, listed by `get_status`), `staging/` (presets waiting for disk mode),
-`field-backup/` (copies of the Field's disk and of any slot file the bridge replaces).
+Everything the bridge records is stored under `~/Music/op-bridge` (or `OP_BRIDGE_HOME`):
+sessions of takes, seeds, samples and backups, presets staged for the next disk-mode round, and
+`field-backup/` copies of every slot file it replaces. The full layout is in [docs/setup.md](docs/setup.md#files).
 
 ## Tests
-
-All tests are functional. Those that need the Field skip when it is not connected.
 
 ```bash
 uv run pytest -q
 ```
 
-## Reference
+All tests are functional. Without a Field attached the device-dependent ones skip themselves
+(currently 139 passed, 12 skipped), and `OP_BRIDGE_HOME` points at a temporary directory.
 
-`docs/device.md` is the device brief including what was measured on a real Field.
-`docs/reference/` holds TE's user guide (firmware 1.7), the MIDI reference and the firmware
-changelog.
+<details>
+<summary><b>Repository map</b></summary>
+
+| Path | Contents |
+|---|---|
+| [`src/op_bridge/server.py`](src/op_bridge/server.py) | The MCP server: every tool, the job runner, the device lock. |
+| [`src/op_bridge/knowledge.py`](src/op_bridge/knowledge.py) | The guides the model reads through `get_guide`. |
+| [`src/op_bridge/device.py`](src/op_bridge/device.py), [`player.py`](src/op_bridge/player.py) | USB MIDI and audio, score playback and take analysis. |
+| [`src/op_bridge/analysis.py`](src/op_bridge/analysis.py) | Levels, pitch, harmonics, onsets, modulation, spectrograms, STOI. |
+| [`src/op_bridge/presets.py`](src/op_bridge/presets.py), [`sampler.py`](src/op_bridge/sampler.py) | Preset file reading, authoring, validation and install. |
+| [`src/op_bridge/drums.py`](src/op_bridge/drums.py), [`kits.py`](src/op_bridge/kits.py) | Drum grid notation and kit maps. |
+| [`src/op_bridge/jobs.py`](src/op_bridge/jobs.py) | Background jobs. |
+| [`src/op_bridge/session.py`](src/op_bridge/session.py) | Config, modes, constraints, sessions, device state, secrets loading. |
+| [`adapters/qwen_audio/`](adapters/qwen_audio) | Optional local audio-model installer and adapter. |
+| [`scripts/`](scripts) | Secret storage, Claude Desktop registration, manual extraction, an effect-knob sweep. |
+| [`examples/lofi_vocoder_song.py`](examples/lofi_vocoder_song.py) | The script behind the first piece recorded to tape. |
+
+</details>
+
+## Documentation
+
+- [docs/setup.md](docs/setup.md): install, Field settings, every client, modes, CLI, secrets, files.
+- [docs/tools.md](docs/tools.md): capabilities and all 72 tools, grouped.
+- [docs/listening.md](docs/listening.md): measurements, spectrograms, the optional local and Google listeners.
+- [docs/device.md](docs/device.md): the device brief and what was measured on a real Field (served to the model as `get_guide("device")`).
+- [docs/reference/](docs/reference/README.md): how to add your own copy of Teenage Engineering's user guide and MIDI tables; they are not distributed here.
+
+## About
+
+Built by Tyler Crabb, working with AI coding agents (Claude Code and Codex), and exercised against a
+real OP-1 field; [docs/device.md](docs/device.md) records what was verified on the device.
+
+op-bridge is an independent project, not affiliated with or endorsed by Teenage Engineering.
+OP-1 is a trademark of Teenage Engineering.
+
+Released under the [MIT licence](LICENSE).
