@@ -714,7 +714,7 @@ def hold_chord(pitches: list[str | int], beats: float = 4.0, tempo: float = 100.
 
 @mcp.tool(annotations=RW)
 def record_to_tape(score: dict[str, Any], name: str | None = None, wait: bool | None = None) -> dict[str, Any]:
-    """Commit a part to the Field's tape: the human must first select the track and arm recording (human_steps arm_recording). Playing the score starts the recording; the bridge stops the tape at the end and keeps a USB capture of the take. Parts longer than about 25 s run as a background job (job_status has the result; the tape is stopped if the job is cancelled)."""
+    """Commit a part to the Field's tape: the human must first select the track and arm recording (human_steps arm_recording). Playing the score starts the recording; the bridge stops the tape at the end and keeps a USB capture of the take. Only clock and notes are sent (a tempo change would cancel the arm), so set the Field's tempo with set_tempo before the human arms. Parts longer than about 25 s run as a background job (job_status has the result; the tape is stopped if the job is cancelled)."""
     cfg = _cfg(); s = _score(score)
     problems = validate(s, cfg)
     if problems:
@@ -724,7 +724,8 @@ def record_to_tape(score: dict[str, Any], name: str | None = None, wait: bool | 
         with _device(cfg, timeout=30.0 if job else 3.0) as f:
             _stage(job, "recording to tape")
             try:
-                res = play_score(f, s, record=True, latency_ms=cfg.latency_ms, cancel=_cancel(job))
+                # the track is armed: a tempo change would cancel the arm, so only clock and notes go out
+                res = play_score(f, s, record=True, latency_ms=cfg.latency_ms, set_tempo=False, cancel=_cancel(job))
             finally:
                 f.cc("tape_stop", 127)
         _stage(job, "saving")
@@ -1090,7 +1091,7 @@ def compile_drum_pattern(pattern: dict[str, Any]) -> dict[str, Any]:
 
 @mcp.tool(annotations=RW)
 def play_drums(pattern: dict[str, Any], kit_slot: int | None = None, record: bool = True, to_tape: bool = False, name: str | None = None, wait: bool | None = None) -> dict[str, Any]:
-    """Play a drum grid document on the loaded drum kit (or on drum slot kit_slot). Hits are checked by onset, not pitch. With to_tape=true the human must have selected a track and armed recording; the first hit starts the take and the tape is stopped at the end."""
+    """Play a drum grid document on the loaded drum kit (or on drum slot kit_slot). Hits are checked by onset, not pitch. With to_tape=true the human must have selected a track and armed recording; only clock and notes are sent (set the tempo with set_tempo before the human arms), the first hit starts the take and the tape is stopped at the end."""
     cfg = _cfg()
     d = DR.parse_pattern(pattern)
     score = DR.compile_drums(d)
@@ -1109,7 +1110,7 @@ def play_drums(pattern: dict[str, Any], kit_slot: int | None = None, record: boo
                 f.set_mode("drum"); time.sleep(0.1)
             _stage(job, "recording to tape" if to_tape else "playing")
             try:
-                res = play_score(f, score, record=record, latency_ms=cfg.latency_ms, cancel=_cancel(job))
+                res = play_score(f, score, record=record, latency_ms=cfg.latency_ms, set_tempo=not to_tape, cancel=_cancel(job))
             finally:
                 if to_tape:
                     f.cc("tape_stop", 127)

@@ -215,8 +215,9 @@ SOUNDS_GUIDE = """Sounds: what a slot can play, what it sounds like, and how to 
 
 - slot_profile(kind, slot): engine, name and the playable range read from the slot's file. Samplers carry a root
   note and keep their character within an octave of it (a Rhodes sample rooted at C5 played at C3 is a slowed,
-  muddy drone); synthesis engines pitch every MIDI note literally. play(...) with sound={"kind","slot"} guards
-  the range and transposes by octaves when needed; keep fundamentals between C1 and C7.
+  muddy drone); synthesis engines pitch every MIDI note literally. play_arrangement_part guards each part against
+  the range of its sound={"kind","slot"} and transposes by octaves when needed (auto_transpose); play and
+  record_to_tape send a score as written, so check slot_profile first. Keep fundamentals between C1 and C7.
 - audit_sound(kind, slot): auditions a low, middle and high note, measures attack, sustain, release, brightness,
   band energies, noisiness, harmonicity, movement and stereo width, derives tags (dark/warm/bright, sustained/
   decaying/short, harmonic/noisy, static/moving) and role suggestions (bass, pad, keys, pluck, lead, drone, fx,

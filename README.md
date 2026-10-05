@@ -182,7 +182,7 @@ uv run pytest -q
 ```
 
 All tests are functional. Without a Field attached the device-dependent ones skip themselves
-(currently 139 passed, 12 skipped), and `OP_BRIDGE_HOME` points at a temporary directory.
+(currently 140 passed, 12 skipped), and `OP_BRIDGE_HOME` points at a temporary directory.
 
 <details>
 <summary><b>Repository map</b></summary>

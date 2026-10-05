@@ -1,4 +1,5 @@
 """Fixes from the 2026-09-26 review, checked on real files and the real tool functions. No test opens the device."""
+import contextlib
 import glob
 import os
 import struct
@@ -10,6 +11,7 @@ import soundfile as sf
 from mcp.server.mcpserver.exceptions import ToolError
 
 from op_bridge import knowledge, presets as P, sampler as S, sequencers as SQ, server as srv, session
+from op_bridge.player import TakeResult, play_score
 from op_bridge.score import Note, Score, pitch_to_midi, validate
 from op_bridge.session import Config
 
@@ -180,6 +182,45 @@ def test_guided_mode_gates_clock_and_cc80_like_set_tempo():
     assert validate(s, cfg) == [], "on the session's fixed tempo CC 80 changes nothing"
     assert any("tempo must be" in p for p in validate(s.model_copy(update={"tempo": 96.0}), cfg))
     assert "send_clock" in srv.hold_chord.__doc__
+
+
+class _SentLog:
+    """Stands in for the connected Field: remembers what the bridge would send and opens no device."""
+    def __init__(self):
+        self.sent = []
+
+    def __getattr__(self, name):
+        return lambda *a, **k: self.sent.append((name, *a))
+
+
+def test_an_armed_tape_track_gets_clock_and_notes_but_no_tempo_change(home, monkeypatch):
+    """docs/device.md section 15: once the human has armed a track, a tempo change (CC 80) cancels the arm.
+    record_to_tape and play_drums(to_tape=true) sent one; the vocoder and arrangement tools already did not."""
+    log = _SentLog()
+    monkeypatch.setattr(srv, "_field", lambda cfg: contextlib.nullcontext(log))
+    asked = []
+
+    def spy(field, score, **kw):
+        asked.append(kw.get("set_tempo", True))
+        return TakeResult(None, None, None, 0, 0.0)
+    monkeypatch.setattr(srv, "play_score", spy)
+    score = {"tempo": 100, "notes": [{"start": 0, "duration": 1, "pitch": "D4"}]}
+    beat = {"tempo": 100, "kit_map": {"BD": 53, "SN": 55}, "patterns": {"A": {"BD": "x.......x.......", "SN": "....x.......x..."}}}
+    assert srv.record_to_tape(score, wait=True)["recorded"] is True
+    assert srv.play_drums(beat, record=False, to_tape=True, wait=True)["on_tape"] is True
+    assert asked == [False, False]
+    assert log.sent.count(("cc", "tape_stop", 127)) == 2, "the tape is still stopped at the end of each take"
+    assert srv.play_drums(beat, record=False, wait=True)["on_tape"] is False
+    assert asked[-1] is True, "off the tape, the Field's tempo still follows the score"
+    for tool in (srv.record_to_tape, srv.play_drums):
+        assert "set_tempo before the human arms" in tool.__doc__
+    # the player itself: with set_tempo off the tempo CC never goes out, with it on it does
+    tiny = Score(tempo=240, notes=[Note(start=0, duration=0.1, pitch="D4")], tail_seconds=0.0)
+    quiet = _SentLog(); play_score(quiet, tiny, record=False, set_tempo=False)
+    assert ("note_on", 62) == quiet.sent[[m[0] for m in quiet.sent].index("note_on")][:2]
+    assert not [m for m in quiet.sent if m[:2] == ("cc", "tempo")]
+    loud = _SentLog(); play_score(loud, tiny, record=False)
+    assert [m for m in loud.sent if m[:2] == ("cc", "tempo")]
 
 
 # --------------------------------------------------------------------------- guides and human steps
