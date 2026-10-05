@@ -249,6 +249,48 @@ a slot until the human reverts it; the device and manual guides are long, open t
 """
 
 
+LISTENING_GUIDE = """AUDIO LISTENING
+Offline is the default. Explicit backend='gemini' sends just the chosen excerpt and question
+to Google's Gemini API. Set GEMINI_API_KEY in ~/Music/op-bridge/secrets.env (or OP_BRIDGE_HOME).
+The saved file is re-read for each request, so rotating the key needs no MCP restart.
+listener_status(backend='gemini') checks configuration without making a network request.
+listen_to_take(id, backend='gemini', model='gemini-3.1-pro-preview', seconds=15) uses Pro;
+model='gemini-3.8-flash' selects Flash. Use cloud analysis only for audio the user has authorized
+sharing with Google. The local model and its files are not required for Gemini requests.
+Gemini's output budget defaults to 2048 tokens, including thinking; allowed range 256–4096.
+There are no automatic retries or uploads on startup/status checks. Reviews include provider,
+model version, usage and an estimated USD cost at published standard-tier rates, not actual billing.
+usable=true means a complete answer, not verified accuracy. Blocked/truncated answers preserve usage
+but are marked unusable. Cancelling stops the local worker and closes its connection; Google
+may still bill work already received. The maximum excerpt duration remains 30 seconds.
+
+LOCAL BACKEND
+listener_status reports whether the optional Qwen2-Audio installation is ready. Explicit setup:
+python3 adapters/qwen_audio/setup.py (Apple Silicon, uv and hf required; about 6.6 GB of model files).
+Inference uses a separate Python runtime, runs offline, and releases model memory after each request.
+
+listen_to_take(id, start_s=0, seconds=15, question=..., channels=None) reads a saved take, audition,
+seed, or absolute WAV path. It does not access the Field. Choose 1–30 seconds and ask one concrete
+question about audible instruments, rhythm, texture or balance. Start with the default neutral question;
+menus of possible instruments and long rubrics caused false positives in calibration. Channels default to 1–2 (main mix on
+10-channel Field USB). For another track, supply its one or two 1-based channel numbers explicitly.
+Input becomes 16 kHz mono, so the model cannot judge stereo placement or treble above 8 kHz.
+
+By default the call returns a job immediately. Poll job_status; cancel_job stops the subprocess.
+The local timeout includes waiting for any other local listener job. Only one local model process runs at a time.
+Reviews and the exact analyzed excerpts are saved under the current session's reviews directory.
+Returned source start/end times are file positions, not events inferred by the model.
+
+Treat observations as fallible evidence. Models can invent instruments, tempo, chords and praise.
+The local controls found broad timbre differences, but also invented drums in a mix without a drum stem;
+layered instrument identification, harmonic accuracy and mix-quality judgment remain unvalidated.
+Use measure_take for measured properties; use known scores plus pitch analysis for harmonic checks.
+Do not equate a fluent description with a good track. Compare the same window in the full mix and
+isolated stems, and check deliberately altered variants when establishing whether a claim is useful.
+This listener is a perceptual aid, not direct hearing by the chat model or an authoritative critic.
+"""
+
+
 def repo_dir() -> str:
     """The checkout this package runs from (src/op_bridge/knowledge.py -> repo root)."""
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -262,6 +304,8 @@ def guide(topic: str = "overview") -> str:
         return QUICKSTART
     if topic == "workflow":
         return WORKFLOW
+    if topic in ("listening", "listener", "listen"):
+        return LISTENING_GUIDE
     if topic in ("score", "scores"):
         return SCORE_GUIDE
     if topic in ("sampler", "sampling", "samples", "resampling"):
@@ -291,7 +335,7 @@ def guide(topic: str = "overview") -> str:
     if topic == "device":
         p = os.path.join(os.path.dirname(REFERENCE_DIR), "device.md")
         return open(p).read() if os.path.exists(p) else "device brief not found"
-    return f"unknown topic {topic!r}; try overview, workflow, score, sampler, sequencers, engines, midi, manual, device"
+    return f"unknown topic {topic!r}; try overview, workflow, listening, score, sampler, sequencers, engines, midi, manual, device"
 
 
 def manual_search(query: str, context: int = 400) -> str:

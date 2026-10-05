@@ -20,6 +20,7 @@ import numpy as np
 from mcp.types import ToolAnnotations
 
 from . import analysis as an
+from . import listener as LI
 from . import knowledge, presets as P, sampler as SM, sequencers as SQ, tape as T
 from .device import Field, find_midi_output, find_audio_input, midi_output_names, audio_devices, usb_layout
 from .jobs import Jobs, Job, Cancelled
@@ -36,7 +37,9 @@ owns settings and sets constraints; read them in get_status). Some steps need th
 (arm recording, select a tape track, enter disk mode, enable a sequencer, toggle an effect): ask with the
 exact key presses from human_steps. Anything longer than about 25 s comes back at once as a job: poll
 job_status(job_id) for the same result a direct call gives, and send no other device calls meanwhile.
-Words are optional; nothing here assumes a vocal."""
+For actual recorded-audio descriptions, use listener_status then listen_to_take; see get_guide("listening").
+Measurements and the text-only Jev judge are not listening. Audio-model descriptions can also be wrong;
+compare stems and variants before changing an arrangement. Words are optional; nothing here assumes a vocal."""
 
 _server = MCPServer("op-bridge", instructions=INSTRUCTIONS, version="0.1.0")
 
@@ -169,6 +172,7 @@ def get_status() -> dict[str, Any]:
         "latency_ms": cfg.latency_ms,
         "notes_for_human": _human(cfg),
         "judge": {"mode": cfg.judge, "active": JU.active_judge(), "note": "local rules always work; Jev ranks by cached taxonomy plus a rubric match when enabled (op-bridge judge auto|local|jev)"},
+        "listener": LI.status(HOME),
         "home": HOME,
     }
 
@@ -195,7 +199,7 @@ def _list_samples(session_d: str) -> list[dict[str, Any]]:
 
 @mcp.tool(annotations=RO)
 def get_guide(topic: str = "overview") -> str:
-    """Reference for wielding the Field. Topics: overview, workflow, score, sampler (synth and drum samplers, resampling takes), sequencers (the seven sequencers and what MIDI drives), engines, midi, device, manual."""
+    """Reference for wielding the Field. Topics: overview, workflow, listening (local audio model), score, sampler (synth and drum samplers, resampling takes), sequencers (the seven sequencers and what MIDI drives), engines, midi, device, manual."""
     return knowledge.guide(topic)
 
 
@@ -773,6 +777,48 @@ def _take_json(cfg: Config, id: str) -> dict[str, Any]:
         if os.path.exists(j):
             return read_json(j)
     return {}
+
+
+@mcp.tool(annotations=RO)
+def listener_status(backend: str = "local") -> dict[str, Any]:
+    """Check local model installation or Gemini key configuration. No network or Field access.
+    backend='gemini' reports configured models; configuration does not prove authentication.
+    """
+    return LI.status(HOME, backend)
+
+
+@mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True))
+def listen_to_take(id: str, start_s: float = 0.0, seconds: float = 15.0,
+                   question: str = LI.DEFAULT_QUESTION, channels: list[int] | None = None,
+                   max_tokens: int | None = None, timeout_seconds: float = 300.0,
+                   wait: bool | None = False, backend: str = "local",
+                   model: str | None = None) -> dict[str, Any]:
+    """Describe a saved take, seed, audition or absolute WAV path with an audio model.
+    Default backend='local' uses offline Qwen2-Audio. Explicit backend='gemini' uploads the
+    excerpt and question to Google, using the saved GEMINI_API_KEY; API charges may apply.
+    Gemini model choices are in listener_status(backend='gemini'). No automatic retries.
+    max_tokens defaults to 256 locally or 2048 for Gemini (including thinking; maximum 4096).
+    Select 1–30 seconds; channels are 1-based (default: first stereo pair, the Field main mix).
+    Returns a background job by default; poll job_status and use cancel_job to stop inference.
+    Cancelling closes the local connection; Google may still bill a request already received.
+    Saves an excerpt and review with source timestamps, measured levels and fallible observations.
+    Gemini reviews include usage, estimated cost and usable=false for blocked/truncated answers.
+    Does not play, record, alter the source audio or access the Field. It cannot verify exact chords,
+    notes, BPM or aesthetic quality. Compare stems/variants and combine observations with measurements.
+    """
+    from pathlib import Path
+    from uuid import uuid4
+    LI.validate_options(start_s, seconds, question, max_tokens, timeout_seconds, backend, model)
+    cfg = _cfg()
+    path = Path(id).expanduser()
+    source = str(path.resolve(strict=True)) if path.is_absolute() else _take_wav(cfg, id)
+    report_dir = Path(_sess_dir(cfg)) / "reviews"
+    def work(job):
+        return LI.listen(HOME, source, report_dir, start_s=start_s, seconds=seconds,
+                         question=question, channels=channels, max_tokens=max_tokens,
+                         timeout_seconds=timeout_seconds, cancel=_cancel(job),
+                         progress=lambda text: _stage(job, text), backend=backend, model=model)
+    return _run_or_job("listen_to_take", "listen-" + uuid4().hex[:6], 60.0, wait, work)
 
 
 @mcp.tool(annotations=RO)
